@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { ROWS_TOP, ROWS_BOTTOM, withOffsets } from '@/lib/slots';
 import { googleFontHref } from '@/lib/fonts';
+import { blankBoard, MAX_BOARDS } from '@/lib/defaults';
 
 const num = (i) => String(i + 1).padStart(2, '0');
 const TOP = withOffsets(ROWS_TOP);
@@ -90,7 +91,7 @@ export default function Admin({ initialAuthed }) {
   const [authed, setAuthed] = useState(initialAuthed);
   const [content, setContent] = useState(null);
   const [hasBlob, setHasBlob] = useState(true);
-  const [tab, setTab] = useState(0); // 0..2 moodboard, 3 = általános
+  const [tab, setTab] = useState(0); // 0.. moodboard, -1 = általános
   const [busy, setBusy] = useState({});
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState('');
@@ -116,7 +117,7 @@ export default function Admin({ initialAuthed }) {
     setDirty(true);
   }, []);
 
-  const board = content && tab < 3 ? content.boards[tab] : null;
+  const board = content && tab >= 0 ? content.boards[tab] : null;
 
   // több fájlt a megadott slottól kezdve az üres helyekre tesz (az első a célslotba kerül)
   async function handleFiles(start, files, b = tab) {
@@ -147,9 +148,30 @@ export default function Admin({ initialAuthed }) {
     handleFiles(first, files.filter((f) => f.type.startsWith('image/')));
   }
 
+  function addBoard() {
+    const i = content.boards.length;
+    update((n) => { n.boards.push(blankBoard()); });
+    setTab(i);
+  }
+
+  function removeBoard() {
+    if (content.boards.length <= 1) return;
+    if (!window.confirm(`Biztosan törlöd a(z) ${num(tab)} moodboardot? Mentés után nem visszaállítható.`)) return;
+    const t = tab;
+    update((n) => { n.boards.splice(t, 1); });
+    setTab(Math.max(0, t - 1));
+  }
+
+  function moveBoard(dir) {
+    const t = tab, j = tab + dir;
+    if (j < 0 || j >= content.boards.length) return;
+    update((n) => { [n.boards[t], n.boards[j]] = [n.boards[j], n.boards[t]]; });
+    setTab(j);
+  }
+
   function loadSamples() {
     if (!window.confirm('Betöltöd a mintaképeket mindhárom moodboardba? A mostani képeket felülírja.')) return;
-    update((n) => n.boards.forEach((b, bi) => {
+    update((n) => n.boards.slice(0, 3).forEach((b, bi) => {
       b.images = b.images.map((_, i) => `/minta/${bi + 1}-${String(i + 1).padStart(2, '0')}.jpg`);
     }));
     setStatus('Mintaképek betöltve — nyomj Mentést');
@@ -189,11 +211,14 @@ export default function Admin({ initialAuthed }) {
           {content.boards.map((b, i) => (
             <button key={i} className={tab === i ? 'on' : ''} onClick={() => setTab(i)}>{num(i)} {b.title}</button>
           ))}
-          <button className={tab === 3 ? 'on' : ''} onClick={() => setTab(3)}>Általános</button>
+          {content.boards.length < MAX_BOARDS && (
+            <button onClick={addBoard} title="Új moodboard hozzáadása">+ Moodboard</button>
+          )}
+          <button className={tab === -1 ? 'on' : ''} onClick={() => setTab(-1)}>Általános</button>
         </nav>
         <div className="a-actions">
           <span className="status">{status || (dirty ? 'Nem mentett változás' : '')}</span>
-          <a href={tab < 3 ? (tab === 0 ? '/' : `/${tab + 1}`) : '/'} target="_blank">Megtekintés ↗</a>
+          <a href={tab > 0 ? `/${tab + 1}` : '/'} target="_blank">Megtekintés ↗</a>
           <button className="primary" disabled={!dirty || uploading} onClick={save}>Mentés</button>
           <button onClick={logout}>Kilépés</button>
         </div>
@@ -201,7 +226,7 @@ export default function Admin({ initialAuthed }) {
 
       {!hasBlob && <p className="warn">Nincs bekötve Vercel Blob store — a feltöltés és a mentés nem fog működni. Lásd README.</p>}
 
-      {tab === 3 ? (
+      {tab === -1 ? (
         <section className="a-form">
           {[['client', 'Ügyfél neve (bal felső sarok)'], ['subtitle', 'Alcím'], ['date', 'Dátum'], ['studio', 'Stúdió neve (lábléc)'], ['studioUrl', 'Stúdió weboldala']].map(([k, l]) => (
             <Field key={k} label={l}>
@@ -210,13 +235,18 @@ export default function Admin({ initialAuthed }) {
           ))}
           <div className="field" style={{ marginTop: 24 }}>
             <span>Mintatartalom</span>
-            <button type="button" onClick={loadSamples}>Mintaképek betöltése (mindhárom moodboard)</button>
+            <button type="button" onClick={loadSamples}>Mintaképek betöltése (01–03 moodboard)</button>
             <small className="status">Minden helyre betölti a mintaképeket (a meglévőket felülírja), utána nyomj Mentést.</small>
           </div>
         </section>
       ) : (
         <div className="a-board">
           <section className="a-form">
+            <div className="board-tools">
+              <button type="button" onClick={() => moveBoard(-1)} disabled={tab === 0}>← Előrébb</button>
+              <button type="button" onClick={() => moveBoard(1)} disabled={tab === content.boards.length - 1}>Hátrébb →</button>
+              <button type="button" className="danger" onClick={removeBoard} disabled={content.boards.length <= 1}>Moodboard törlése</button>
+            </div>
             <Field label="Irány neve (cím alatt és a menüben)">
               <input value={board.title} onChange={(e) => update((n) => { n.boards[tab].title = e.target.value; })} />
             </Field>

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { getContent } from '@/lib/content';
 import { googleFontHref } from '@/lib/fonts';
 import Board from '@/components/Board';
@@ -14,6 +15,7 @@ const num = (i) => String(i + 1).padStart(2, '0');
 export default async function BoardPage({ idx }) {
   const { site, boards } = await getContent();
   const board = boards[idx];
+  if (!board) notFound();
   const fontHref = googleFontHref([board.font]);
 
   const theme = themeVars(board.bg);
@@ -24,7 +26,7 @@ export default async function BoardPage({ idx }) {
       {fontHref && <link rel="stylesheet" href={fontHref} />}
       <header className="nav">
         <Link href="/" className="nav-brand">{site.client}</Link>
-        <nav className="nav-tabs" style={{ '--i': idx }}>
+        <nav className={`nav-tabs${boards.length > 3 ? ' many' : ''}`} style={{ '--i': idx, '--n': boards.length }}>
           {boards.map((b, i) => (
             <Link key={i} href={i === 0 ? '/' : `/${i + 1}`} className={i === idx ? 'on' : ''} scroll={false}>
               <span className="n">{num(i)}</span>
