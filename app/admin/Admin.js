@@ -147,6 +147,14 @@ export default function Admin({ initialAuthed }) {
     handleFiles(first, files.filter((f) => f.type.startsWith('image/')));
   }
 
+  function loadSamples() {
+    if (!window.confirm('Betöltöd a mintaképeket mindhárom moodboardba? A mostani képeket felülírja.')) return;
+    update((n) => n.boards.forEach((b, bi) => {
+      b.images = b.images.map((_, i) => `/minta/${bi + 1}-${String(i + 1).padStart(2, '0')}.jpg`);
+    }));
+    setStatus('Mintaképek betöltve — nyomj Mentést');
+  }
+
   async function save() {
     setStatus('Mentés…');
     const r = await fetch('/api/content', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(content) });
@@ -200,6 +208,11 @@ export default function Admin({ initialAuthed }) {
               <input value={content.site[k]} onChange={(e) => update((n) => { n.site[k] = e.target.value; })} />
             </Field>
           ))}
+          <div className="field" style={{ marginTop: 24 }}>
+            <span>Mintatartalom</span>
+            <button type="button" onClick={loadSamples}>Mintaképek betöltése (mindhárom moodboard)</button>
+            <small className="status">Minden helyre betölti a mintaképeket (a meglévőket felülírja), utána nyomj Mentést.</small>
+          </div>
         </section>
       ) : (
         <div className="a-board">
