@@ -1,6 +1,6 @@
 import BoardPage, { boardMetadata } from '@/components/BoardPage';
 
-export const revalidate = 3600; // mentéskor azonnal frissül
+export const dynamic = 'force-dynamic'; // a tartalom cache-elt, mentéskor ürül
 export const generateMetadata = boardMetadata;
 
 export default function Page() {
